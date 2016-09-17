@@ -48,4 +48,9 @@ else ()
   set(SOURCES ${SOURCES} ${SOURCES_COMPILER_VEC})
 endif ()
 
+###
+if (USE_CUDA)
+  set(SOURCES ${SOURCE_HPSI_CUDA})
+endif ()
+
 add_library(${STENCIL_LIB} STATIC ${SOURCES})

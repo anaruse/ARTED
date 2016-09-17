@@ -234,7 +234,14 @@ contains
       nabt( 9:12,ikb)=kAc(ik,3)*nabz(1:4)
     enddo
 !$acc end kernels
+#ifndef USE_CUDA
     call hpsi1_RT_stencil_LBLK(k2lap0_2(:),Vloc,lapt,nabt(:,:),tpsi(:,:),htpsi(:,:), ikb_s,ikb_e)
+#else
+!$acc host_data use_device(k2lap0_2, Vloc, lapt, nabt, tpsi, htpsi, modx, mody, modz)  
+    call hpsi1_RT_stencil_gpu(k2lap0_2(:),Vloc,lapt,nabt(:,:),tpsi(:,:),htpsi(:,:), ikb_s,ikb_e,&
+      PNLx,PNLy,PNLz, NLx,NLy,NLz, modx,mody,modz, myrank)
+!$acc end host_data                                                                    
+#endif
     TIMELOG_END(LOG_HPSI_STENCIL)
     NVTX_END()
 

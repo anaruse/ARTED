@@ -67,6 +67,8 @@ parser.add_option('--papi',                action='store_true',  default=False, 
 parser.add_option('--tlog',                action='store_true',  default=False, dest='tlog',              help='use TLOG profiling.')
 parser.add_option('--nvtx',                action='store_true',  default=False, dest='nvtx',              help='use NVIDIA Tools Extention Library.')
 parser.add_option('--threads-profiler',    action='store_true',  default=False, dest='profile_threads',   help='profile each OpenMP threads')
+parser.add_option('--use-cuda',            action='store_true',  default=False, dest='use_cuda',          help='use cuda')
+
 
 (options, args) = parser.parse_args()
 
@@ -99,6 +101,8 @@ dict['STENCIL_WITH_C']         = on_or_off(options.stencil_with_c)
 dict['LOOP_BLOCKING']          = on_or_off(options.loop_blocking)
 dict['DOMAIN_POWER_OF_TWO']    = on_or_off(options.domain_two)
 dict['EXPLICIT_VEC']           = on_or_off(options.explicit_vec)
+dict['USE_CUDA']               = on_or_off(options.use_cuda)
+
 
 define = ''
 for k,v in dict.items():
