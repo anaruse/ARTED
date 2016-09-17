@@ -139,6 +139,7 @@ contains
     allocate(ztpsi(0:PNL-1,4,0:NUMBER_THREADS-1))
 #else
     blk_nkb_hpsi = min(at_least_parallelism/PNL + 1, NKB)
+    blk_nkb_hpsi = min(blk_nkb_hpsi, 512)
     allocate(ztpsi(0:PNL-1, 0:blk_nkb_hpsi-1, 4))
     !write(*,*) "blk_nkb_hpsi:", blk_nkb_hpsi
 

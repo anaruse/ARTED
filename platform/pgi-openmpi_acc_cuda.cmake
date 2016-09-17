@@ -21,6 +21,13 @@ set(CMAKE_C_COMPILER            "mpicc")
 set(CMAKE_C_FLAGS_DEBUG         "-pg")
 set(CMAKE_C_FLAGS_RELEASE       "-fastsse")
 
+# for CMAKE CUDA package
+set(CUDA_PROPAGATE_HOST_FLAGS OFF)
+set(CUDA_HOST_COMPILER        "g++")
+set(CUDA_NVCC_FLAGS           "--generate-code arch=compute_35,code=sm_35 -Xptxas=-v")
+set(CUDA_NVCC_FLAGS_DEBUG     "-lineinfo")
+set(CUDA_NVCC_FLAGS_RELEASE   "-O3")
+
 # set(ENABLE_STENCIL_WITH_C         1)
 # set(ENABLE_EXPLICIT_VECTORIZATION 1)
 # set(ENABLE_REDUCE_FOR_MANYCORE    1)

@@ -57,7 +57,7 @@ endif ()
 
 
 ### Project settings
-project(ARTED Fortran C)
+project(ARTED Fortran C CXX)
 
 if (${CMAKE_CROSSCOMPILING})
   # cross compile mode, use toolchain file.
@@ -215,6 +215,7 @@ set(LIBRARIES
     ${COMMON_LIB}
     ${STENCIL_LIB}
     ${MODULE_LIB}
+    -lstdc++
     )
 
 if (${BUILD_TARGET} STREQUAL "ms")

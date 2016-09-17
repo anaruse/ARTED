@@ -49,8 +49,15 @@ else ()
 endif ()
 
 ###
-if (USE_CUDA)
-  set(SOURCES ${SOURCE_HPSI_CUDA})
-endif ()
+set(SOURCE_HPSI_CUDA
+    CUDA/hpsi_stencil_cuda.cu
+    )
 
-add_library(${STENCIL_LIB} STATIC ${SOURCES})
+###
+if (USE_CUDA)
+  find_package(CUDA)
+  set(SOURCES ${SOURCES} ${SOURCE_HPSI_CUDA})
+  cuda_add_library(${STENCIL_LIB} STATIC ${SOURCES})
+else ()
+  add_library(${STENCIL_LIB} STATIC ${SOURCES})
+endif ()

@@ -2,11 +2,11 @@
 #include <assert.h>
 #include <cuComplex.h>
 
-#define USE_V1  // naive version, each thread handles one cell
+// #define USE_V1  // naive version, each thread handles one cell
 // #define USE_V2  // each thread handles multiple cells along x-dir. keep data of 9 cells along x-dir on registers to reduce memory traffic.
 // #define USE_V4  // 2 kernels. 1st kernel does x-dir stencil computes. 2nd kernel does y-dir and z-dir stencil computes.
 // #define USE_V5  // 2 kernels, shared memory is used in 2nd kernel (this is good in case of small grid size such as 16x16x16)
-// #define USE_V8  // 2 kernels, 1st kernel is optimized for reducing memory access as much as possible.
+#define USE_V8  // 2 kernels, 1st kernel is optimized for reducing memory access as much as possible.
 // #define USE_CPU
 
 #define USE_CONST  // use constant memory for arrays such as C() and D().
@@ -56,6 +56,9 @@ __constant__ double  _D_const[12*MAX_NKB];
 #endif
 
 /* */
+
+static int is_init = 0;
+static cudaStream_t st;
 
 extern __shared__ void* _dyn_smem[];
 
@@ -744,22 +747,48 @@ void hpsi1_rt_stencil_gpu(double *_A,  // k2lap0_2(:)
 			  int NLx, int NLy, int NLz,
 			  int *modx, int *mody, int *modz, int myrank )
 {
+#if 0
+    fprintf( stderr, "_A:%p\n", _A );
+    fprintf( stderr, "_B:%p\n", _B );
+    fprintf( stderr, "_C:%p\n", _C );
+    fprintf( stderr, "_D:%p\n", _D );
+    fprintf( stderr, "_E:%p\n", _E );
+    fprintf( stderr, "_F:%p\n", _F );
+    fprintf( stderr, "IKB_s:%d\n", IKB_s );
+    fprintf( stderr, "IKB_e:%d\n", IKB_e );
+    fprintf( stderr, "PNLx:%d\n", PNLx );
+    fprintf( stderr, "PNLy:%d\n", PNLy );
+    fprintf( stderr, "PNLz:%d\n", PNLz );
+    fprintf( stderr, "NLx:%d\n", NLx );
+    fprintf( stderr, "NLy:%d\n", NLy );
+    fprintf( stderr, "NLz:%d\n", NLz );
+    fprintf( stderr, "modx:%p\n", modx );
+    fprintf( stderr, "mody:%p\n", mody );
+    fprintf( stderr, "modz:%p\n", modz );
+    fprintf( stderr, "myrank:%d\n", myrank );
+#endif
+
+    if ( is_init == 0 ) {
+	CUDA_CALL( cudaStreamCreate( &st ) );
+	is_init = 1;
+    }
+
     int Nkb = IKB_e - IKB_s + 1;
 
 #ifdef USE_CONST
-    CUDA_CALL( cudaMemcpyToSymbolAsync( _C_const, _C, sizeof(double)*12,     0, cudaMemcpyDeviceToDevice, 0 ) );
+    CUDA_CALL( cudaMemcpyToSymbolAsync( _C_const, _C, sizeof(double)*12,     0, cudaMemcpyDeviceToDevice, st ) );
 
     assert( Nkb <= MAX_NKB );
-    CUDA_CALL( cudaMemcpyToSymbolAsync( _D_const, _D, sizeof(double)*12*Nkb, 0, cudaMemcpyDeviceToDevice, 0 ) );
+    CUDA_CALL( cudaMemcpyToSymbolAsync( _D_const, _D, sizeof(double)*12*Nkb, 0, cudaMemcpyDeviceToDevice, st ) );
 #endif
 
 #ifdef USE_V1
     {
 	dim3 ts(128,1,1);
 	dim3 bs(DIV_CEIL((NLy*NLz),ts.x),Nkb,1);
-	hpsi1_rt_stencil_kern_v1<<< bs, ts >>>( Nkb, _A, _B, _C, _D, _E, _F,
-						PNLx, PNLy, PNLz, NLx, NLy, NLz, modx, mody, modz );
-	CUDA_CALL( cudaDeviceSynchronize() );
+	hpsi1_rt_stencil_kern_v1<<< bs, ts, 0, st >>>( Nkb, _A, _B, _C, _D, _E, _F,
+						       PNLx, PNLy, PNLz, NLx, NLy, NLz, modx, mody, modz );
+	CUDA_CALL( cudaStreamSynchronize(st) );
     }
 #endif
 
@@ -767,9 +796,9 @@ void hpsi1_rt_stencil_gpu(double *_A,  // k2lap0_2(:)
     {
 	dim3 ts(128,1,1);
 	dim3 bs(DIV_CEIL((NLy*NLz),ts.x),Nkb,1);
-	hpsi1_rt_stencil_kern_v2<<< bs, ts >>>( Nkb, _A, _B, _C, _D, _E, _F,
-						PNLx, PNLy, PNLz, NLx, NLy, NLz, modx, mody, modz );
-	CUDA_CALL( cudaDeviceSynchronize() );
+	hpsi1_rt_stencil_kern_v2<<< bs, ts, 0, st >>>( Nkb, _A, _B, _C, _D, _E, _F,
+						       PNLx, PNLy, PNLz, NLx, NLy, NLz, modx, mody, modz );
+	CUDA_CALL( cudaStreamSynchronize(st) );
     }
 #endif
 
@@ -777,14 +806,14 @@ void hpsi1_rt_stencil_gpu(double *_A,  // k2lap0_2(:)
     {
 	dim3 ts_1(128,1,1);
 	dim3 bs_1(DIV_CEIL((NLy*NLz),ts_1.x),Nkb,1);
-	hpsi1_rt_stencil_kern_v4_1<<< bs_1, ts_1 >>>( Nkb, _A, _B, _C, _D, _E, _F,
-						      PNLx, PNLy, PNLz, NLx, NLy, NLz, modx, mody, modz );
+	hpsi1_rt_stencil_kern_v4_1<<< bs_1, ts_1, 0, st >>>( Nkb, _A, _B, _C, _D, _E, _F,
+							     PNLx, PNLy, PNLz, NLx, NLy, NLz, modx, mody, modz );
 
 	dim3 ts_2(128,1,1);
 	dim3 bs_2(DIV_CEIL((NLx*NLz),ts_2.x),Nkb,1);
-	hpsi1_rt_stencil_kern_v4_2<<< bs_2, ts_2 >>>( Nkb, _A, _B, _C, _D, _E, _F,
-						      PNLx, PNLy, PNLz, NLx, NLy, NLz, modx, mody, modz );
-	CUDA_CALL( cudaDeviceSynchronize() );
+	hpsi1_rt_stencil_kern_v4_2<<< bs_2, ts_2, 0, st >>>( Nkb, _A, _B, _C, _D, _E, _F,
+							     PNLx, PNLy, PNLz, NLx, NLy, NLz, modx, mody, modz );
+	CUDA_CALL( cudaStreamSynchronize(st) );
     }
 #endif
 
@@ -792,17 +821,17 @@ void hpsi1_rt_stencil_gpu(double *_A,  // k2lap0_2(:)
     {
 	dim3 ts_1(128,1,1);
 	dim3 bs_1(DIV_CEIL((NLy*NLz),ts_1.x),Nkb,1);
-	hpsi1_rt_stencil_kern_v5_1<<< bs_1, ts_1 >>>( Nkb, _A, _B, _C, _D, _E, _F, 
-						      PNLx, PNLy, PNLz, NLx, NLy, NLz, modx, mody, modz );
+	hpsi1_rt_stencil_kern_v5_1<<< bs_1, ts_1, 0, st >>>( Nkb, _A, _B, _C, _D, _E, _F, 
+							     PNLx, PNLy, PNLz, NLx, NLy, NLz, modx, mody, modz );
 
 	dim3 ts_2(1024,1,1);
 	while (ts_2.x > NLy*NLz) { ts_2.x /= 2;	}
 	dim3 bs_2(NLx,Nkb,1);
 	size_t  smem_size = sizeof(cuDoubleComplex)*NLy*NLz;
 	assert(smem_size <= 48*1024);
-	hpsi1_rt_stencil_kern_v5_2<<< bs_2, ts_2, smem_size >>>( Nkb, _A, _B, _C, _D, _E, _F,
-								 PNLx, PNLy, PNLz, NLx, NLy, NLz, modx, mody, modz );
-	CUDA_CALL( cudaDeviceSynchronize() );
+	hpsi1_rt_stencil_kern_v5_2<<< bs_2, ts_2, smem_size, st >>>( Nkb, _A, _B, _C, _D, _E, _F,
+								     PNLx, PNLy, PNLz, NLx, NLy, NLz, modx, mody, modz );
+	CUDA_CALL( cudaStreamSynchronize(st) );
     }
 #endif
 
@@ -812,20 +841,20 @@ void hpsi1_rt_stencil_gpu(double *_A,  // k2lap0_2(:)
 	dim3 bs_1(DIV_CEIL((NLy*NLz),ts_1.x),Nkb,1);
 	if ( 0 ) {}
 	else if ( NLx == 20 ) {
-	    hpsi1_rt_stencil_kern_v8_1<20><<< bs_1, ts_1 >>>( Nkb, _A, _B, _C, _D, _E, _F,
-							      PNLx, PNLy, PNLz, NLx, NLy, NLz, modx, mody, modz );
+	    hpsi1_rt_stencil_kern_v8_1<20><<< bs_1, ts_1, 0, st >>>( Nkb, _A, _B, _C, _D, _E, _F,
+								     PNLx, PNLy, PNLz, NLx, NLy, NLz, modx, mody, modz );
 	}
 	else if ( NLx == 16 ) {
-	    hpsi1_rt_stencil_kern_v8_1<16><<< bs_1, ts_1 >>>( Nkb, _A, _B, _C, _D, _E, _F,
-							      PNLx, PNLy, PNLz, NLx, NLy, NLz, modx, mody, modz );
+	    hpsi1_rt_stencil_kern_v8_1<16><<< bs_1, ts_1, 0, st >>>( Nkb, _A, _B, _C, _D, _E, _F,
+								     PNLx, PNLy, PNLz, NLx, NLy, NLz, modx, mody, modz );
 	}
 	else { exit( -1 ); }
 
 	dim3 ts_2(128,1,1);
 	dim3 bs_2(DIV_CEIL((NLx*NLz),ts_2.x),Nkb,1);
-	hpsi1_rt_stencil_kern_v8_2<<< bs_2, ts_2 >>>( Nkb, _A, _B, _C, _D, _E, _F,
-						      PNLx, PNLy, PNLz, NLx, NLy, NLz, modx, mody, modz );
-	CUDA_CALL( cudaDeviceSynchronize() );
+	hpsi1_rt_stencil_kern_v8_2<<< bs_2, ts_2, 0, st >>>( Nkb, _A, _B, _C, _D, _E, _F,
+							     PNLx, PNLy, PNLz, NLx, NLy, NLz, modx, mody, modz );
+	CUDA_CALL( cudaStreamSynchronize(st) );
     }
 #endif
 
@@ -973,4 +1002,3 @@ extern "C" {
 			     modx, mody, modz, *myrank );
     }
 }
-
