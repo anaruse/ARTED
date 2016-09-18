@@ -141,7 +141,7 @@ subroutine current_stencil_LBLK(E, ikb_s,ikb_e)
 # define IDZ(dt) modz(iz+(dt)+NLz),iy,ix,ib,ik
 #endif
 
-!$acc kernels pcopy(zcx,zcy,zcz) &
+!$acc parallel vector_length(256) pcopy(zcx,zcy,zcz) &
 #ifndef ARTED_DOMAIN_POWER_OF_TWO
 !$acc pcopyin(modx,mody,modz) &
 #endif
@@ -152,10 +152,11 @@ subroutine current_stencil_LBLK(E, ikb_s,ikb_e)
     ib=ib_table(ikb)
 
     F = 0
-!$acc loop collapse(3) vector(128) reduction(+:F)
+!$acc loop collapse(2) vector reduction(+:F)
     do iy=0,NLy-1
-    do ix=0,NLx-1
     do iz=0,NLz-1
+!$acc loop seq
+    do ix=0,NLx-1
       w = conjg(E(iz,iy,ix, ib,ik))
       v=(nabx(1)*(E(IDX(1))) &
       & +nabx(2)*(E(IDX(2))) &
@@ -168,10 +169,11 @@ subroutine current_stencil_LBLK(E, ikb_s,ikb_e)
     zcx(ib,ik)=F * 2.d0
 
     G = 0
-!$acc loop collapse(3) vector(128) reduction(+:G)
+!$acc loop collapse(2) vector reduction(+:G)
     do ix=0,NLx-1
-    do iy=0,NLy-1
     do iz=0,NLz-1
+!$acc loop seq
+    do iy=0,NLy-1
       w = conjg(E(iz,iy,ix, ib,ik))
       v=(naby(1)*(E(IDY(1))) &
       & +naby(2)*(E(IDY(2))) &
@@ -184,10 +186,11 @@ subroutine current_stencil_LBLK(E, ikb_s,ikb_e)
     zcy(ib,ik)=G * 2.d0
 
     H = 0
-!$acc loop collapse(3) vector(128) reduction(+:H)
-    do ix=0,NLx-1
+!$acc loop collapse(2) vector reduction(+:H)
     do iy=0,NLy-1
     do iz=0,NLz-1
+!$acc loop seq
+    do ix=0,NLx-1
       w = conjg(E(iz,iy,ix, ib,ik))
       v=(nabz(1)*(E(IDZ(1))) &
       & +nabz(2)*(E(IDZ(2))) &
@@ -199,6 +202,6 @@ subroutine current_stencil_LBLK(E, ikb_s,ikb_e)
     end do
     zcz(ib,ik)=H * 2.d0
   end do
-!$acc end kernels
+!$acc end parallel
 end subroutine
 #endif

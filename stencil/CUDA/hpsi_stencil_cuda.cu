@@ -9,7 +9,7 @@
 #define USE_V8  // 2 kernels, 1st kernel is optimized for reducing memory access as much as possible.
 // #define USE_CPU
 
-#define USE_CONST  // use constant memory for arrays such as C() and D().
+// #define USE_CONST  // use constant memory for arrays such as C() and D().
 
 __host__ __device__ inline int CALC_INDEX2( int x, int nx, int y, int ny )
 {
